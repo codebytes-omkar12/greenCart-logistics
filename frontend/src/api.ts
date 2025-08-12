@@ -1,11 +1,11 @@
 import axios from 'axios';
-import { type ICredentials, type ISimulationParams } from './types';
+import { type ICredentials, type ISimulationParams, type IDriver } from './types';
 
 const API_URL = 'http://localhost:5000/api';
 
 const apiClient = axios.create({
   baseURL: API_URL,
-  withCredentials: true, // This is the most important part
+  withCredentials: true,
 });
 
 export const api = {
@@ -13,7 +13,7 @@ export const api = {
   login: (credentials: ICredentials) => apiClient.post('/login', credentials),
   register: (userData: ICredentials) => apiClient.post('/register', userData),
   logout: () => apiClient.post('/logout'),
-  checkAuthStatus: () => apiClient.get('/auth/status'), // New function to check the cookie
+  checkAuthStatus: () => apiClient.get('/auth/status'),
 
   // --- Data Fetching ---
   getDashboardStats: () => apiClient.get('/dashboard/stats'),
@@ -21,6 +21,11 @@ export const api = {
   getRoutes: () => apiClient.get('/routes'),
   getOrders: () => apiClient.get('/orders'),
   getSimulations: () => apiClient.get('/simulations'),
+
+  // --- Driver Actions ---
+  createDriver: (driverData: Omit<IDriver, '_id'>) => apiClient.post('/drivers', driverData),
+  updateDriver: (id: string, driverData: Partial<IDriver>) => apiClient.put(`/drivers/${id}`, driverData),
+  deleteDriver: (id: string) => apiClient.delete(`/drivers/${id}`),
 
   // --- Simulation Actions ---
   runSimulation: (params: ISimulationParams) => apiClient.post('/simulate', params),
