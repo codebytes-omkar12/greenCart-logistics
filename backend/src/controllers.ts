@@ -2,9 +2,10 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+
 import {
     User, Driver, Route, Order, Simulation,
-    IUser, IDriver, IRoute, IOrder
+    IUser, IDriver, IRoute, IOrder,ISimulation
 } from './models';
 
 // Initialize AI
@@ -88,7 +89,18 @@ export const getAuthStatus = (req: Request, res: Response) => {
 
 export const getDrivers = async (req: Request, res: Response) => {
     try {
-        const drivers: IDriver[] = await Driver.find();
+        const { name, isFatigued } = req.query;
+        const filter: any = {};
+
+        if (name) {
+            // Use regex for case-insensitive partial matching
+            filter.name = { $regex: name, $options: 'i' };
+        }
+        if (isFatigued) {
+            filter.isFatigued = isFatigued === 'true';
+        }
+
+        const drivers: IDriver[] = await Driver.find(filter);
         res.json(drivers);
     } catch (error: any) {
         res.status(500).json({ message: "Error fetching drivers", error: error.message });
@@ -97,7 +109,20 @@ export const getDrivers = async (req: Request, res: Response) => {
 
 export const getRoutes = async (req: Request, res: Response) => {
     try {
-        const routes: IRoute[] = await Route.find();
+        const { routeID, trafficLevel } = req.query;
+        const filter: any = {};
+
+        if (routeID) {
+            filter.routeID = { $regex: routeID, $options: 'i' };
+        }
+        if (trafficLevel) {
+            // Ensure it's one of the allowed enum values
+            if (['Low', 'Medium', 'High'].includes(trafficLevel as string)) {
+                filter.trafficLevel = trafficLevel;
+            }
+        }
+
+        const routes: IRoute[] = await Route.find(filter);
         res.json(routes);
     } catch (error: any) {
         res.status(500).json({ message: "Error fetching routes", error: error.message });
@@ -106,7 +131,18 @@ export const getRoutes = async (req: Request, res: Response) => {
 
 export const getOrders = async (req: Request, res: Response) => {
     try {
-        const orders: IOrder[] = await Order.find().populate('assignedRoute');
+        const { orderID, hasBeenDelivered } = req.query;
+        const filter: any = {};
+
+        if (orderID) {
+            filter.orderID = { $regex: orderID, $options: 'i' };
+        }
+        if (hasBeenDelivered) {
+            // Search for orders that either have a delivery timestamp or don't
+            filter.deliveryTimestamp = { $exists: hasBeenDelivered === 'true' };
+        }
+
+        const orders: IOrder[] = await Order.find(filter).populate('assignedRoute');
         res.json(orders);
     } catch (error: any) {
         res.status(500).json({ message: "Error fetching orders", error: error.message });
@@ -114,6 +150,7 @@ export const getOrders = async (req: Request, res: Response) => {
 };
 
 export const getSimulations = async (req: Request, res: Response) => {
+    // No filtering needed for simulations for now
     try {
         const simulations = await Simulation.find().sort({ timestamp: -1 }).limit(10);
         res.json(simulations);
@@ -176,30 +213,10 @@ export const runSimulation = async (req: Request, res: Response) => {
 
         const efficiencyScore = pendingOrders.length > 0 ? (onTimeDeliveries / pendingOrders.length) * 100 : 0;
 
-        const prompt = `You are an expert operations analyst reporting directly to a manager at GreenCart Logistics. Your tone should be professional, concise, and data-driven.
-
-Based on the following raw data from a recent delivery simulation, provide a brief, insightful summary of no more than three sentences.
-
-Start with a direct statement about the overall profitability and efficiency. Then, highlight the single most significant factor (e.g., late delivery penalties, high fuel costs) that impacted the result. Conclude with one clear, actionable recommendation for improvement.
-
-**Simulation Data:**
-- Total Profit: Rs. ${totalProfit.toFixed(2)}
-- Efficiency Score: ${efficiencyScore.toFixed(2)}%
-- On-time Deliveries: ${onTimeDeliveries}
-- Late Deliveries: ${lateDeliveries}
-- Total Orders Simulated: ${pendingOrders.length}
-- Simulation Inputs: ${numDrivers} drivers, max ${maxHours} hours/day.
-- Fuel Cost Breakdown by Traffic:
-  - Low: Rs. ${fuelCostBreakdown.Low.toFixed(2)}
-  - Medium: Rs. ${fuelCostBreakdown.Medium.toFixed(2)}
-  - High: Rs. ${fuelCostBreakdown.High.toFixed(2)}
-
-Please provide only the summary text.`;
-        const result = await genAI.getGenerativeModel({ model: "gemini-pro" }).generateContent(prompt);
-        const aiSummary = result.response.text();
+       
 
         const newSimulation = new Simulation({
-            totalProfit, efficiencyScore, onTimeDeliveries, lateDeliveries, fuelCostBreakdown, aiSummary
+            totalProfit, efficiencyScore, onTimeDeliveries, lateDeliveries, fuelCostBreakdown
         });
         await newSimulation.save();
 
@@ -209,4 +226,92 @@ Please provide only the summary text.`;
         console.error("Simulation Error:", error);
         res.status(500).json({ message: 'An error occurred during the simulation.', error: error.message });
     }
+};
+
+// AI SUMMARY END POINT
+export const generateAiSummary = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const simulation: ISimulation | null = await Simulation.findById(id);
+
+        if (!simulation) {
+            return res.status(404).json({ message: 'Simulation not found.' });
+        }
+
+        // If summary and tags already exist, stream the summary back
+        if (simulation.aiSummary && simulation.tags.length > 0) {
+            return streamText(res, simulation.aiSummary);
+        }
+
+        // --- UPDATED PROMPT ---
+        // This prompt now asks for a specific JSON structure.
+        const prompt = `You are an expert operations analyst for GreenCart Logistics.
+                Analyze the following simulation data and return a JSON object with two keys: "summary" and "tags".
+
+                **Rules for "summary"**:
+                - A professional, concise summary (max 3 sentences).
+                - Start with profitability and efficiency.
+                - Highlight the single most significant factor.
+                - Conclude with one actionable recommendation.
+
+                **Rules for "tags"**:
+                - An array of 3-5 short, descriptive strings.
+                - Tags should reflect the key outcomes (e.g., "High Profit", "Poor Efficiency", "High Fuel Costs", "On-Time Success").
+
+                **Simulation Data:**
+                - Total Profit: Rs. ${simulation.totalProfit.toFixed(2)}
+                - Efficiency Score: ${simulation.efficiencyScore.toFixed(2)}%
+                - On-time Deliveries: ${simulation.onTimeDeliveries}
+                - Late Deliveries: ${simulation.lateDeliveries}
+
+                **Return only the raw JSON object.**`;
+        
+        const result = await genAI.getGenerativeModel({ model: "gemini-pro" }).generateContent(prompt);
+        const responseText = result.response.text();
+
+        // --- PARSE THE JSON RESPONSE ---
+        const aiResponse = JSON.parse(responseText);
+        const { summary, tags } = aiResponse;
+
+        if (!summary || !tags) {
+            throw new Error("AI response did not contain summary or tags.");
+        }
+
+        // Save both summary and tags to the database
+        simulation.aiSummary = summary;
+        simulation.tags = tags;
+        await simulation.save();
+        
+        // Stream only the summary text for the typing effect
+        streamText(res, summary);
+
+    } catch (error: any) {
+        console.error("AI Summary/Tag Generation Error:", error);
+        res.status(500).json({ message: 'Failed to generate AI content.' });
+    }
+};
+
+// Helper function to handle the streaming logic
+const streamText = (res: Response, text: string) => {
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    const words = text.split(' ');
+    let wordIndex = 0;
+
+    const intervalId = setInterval(() => {
+        if (wordIndex < words.length) {
+            res.write(words[wordIndex] + ' ');
+            wordIndex++;
+        } else {
+            clearInterval(intervalId);
+            res.end();
+        }
+    }, 120); // Typing speed
+
+    res.on('close', () => {
+        clearInterval(intervalId);
+        res.end();
+    });
 };

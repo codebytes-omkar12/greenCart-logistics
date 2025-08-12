@@ -71,6 +71,7 @@ export interface ISimulation extends Document {
     lateDeliveries: number;
     fuelCostBreakdown: { [key: string]: number };
     aiSummary: string;
+    tags: string[];
 }
 const SimulationSchema: Schema = new Schema({
     timestamp: { type: Date, default: Date.now },
@@ -80,5 +81,6 @@ const SimulationSchema: Schema = new Schema({
     lateDeliveries: Number,
     fuelCostBreakdown: Schema.Types.Mixed,
     aiSummary: String,
+    tags: { type: [String], default: [] },
 });
 export const Simulation = mongoose.model<ISimulation>('Simulation', SimulationSchema);

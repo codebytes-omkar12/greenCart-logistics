@@ -1,10 +1,3 @@
-/*
- * GreenCart Logistics - Backend Server (Refactored)
- *
- * This file handles server setup, middleware, and API routing.
- * All business logic is delegated to controllers.
- */
-
 import express, { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import session from 'express-session';
@@ -72,6 +65,8 @@ app.get('/api/simulations', requireAuth, controllers.getSimulations);
 
 // Core Simulation Route
 app.post('/api/simulate', requireAuth, controllers.runSimulation);
+
+app.post('/api/simulations/:id/generate-summary', requireAuth, controllers.generateAiSummary);
 
 // --- SERVER START & EXPORT ---
 app.listen(PORT, () => console.log(`Backend server running on http://localhost:${PORT}`));
