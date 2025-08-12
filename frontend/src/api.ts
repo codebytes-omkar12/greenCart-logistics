@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { type ICredentials, type ISimulationParams, type IDriver } from './types';
+import { type ICredentials, type ISimulationParams, type IDriver, type IRoute, type IOrder  } from './types';
 
 const API_URL = 'http://localhost:5000/api';
 
@@ -26,6 +26,15 @@ export const api = {
   createDriver: (driverData: Omit<IDriver, '_id'>) => apiClient.post('/drivers', driverData),
   updateDriver: (id: string, driverData: Partial<IDriver>) => apiClient.put(`/drivers/${id}`, driverData),
   deleteDriver: (id: string) => apiClient.delete(`/drivers/${id}`),
+  
+  // --- Route Actions ---
+  createRoute: (routeData: Omit<IRoute, '_id'>) => apiClient.post('/routes', routeData),
+  updateRoute: (id: string, routeData: Partial<IRoute>) => apiClient.put(`/routes/${id}`, routeData),
+  deleteRoute: (id: string) => apiClient.delete(`/routes/${id}`),
+
+createOrder: (orderData: Omit<IOrder, '_id' | 'assignedRoute'> & { assignedRoute: string }) => apiClient.post('/orders', orderData),
+  updateOrder: (id: string, orderData: Partial<Omit<IOrder, '_id' | 'assignedRoute'>> & { assignedRoute?: string }) => apiClient.put(`/orders/${id}`, orderData),
+  deleteOrder: (id: string) => apiClient.delete(`/orders/${id}`),
 
   // --- Simulation Actions ---
   runSimulation: (params: ISimulationParams) => apiClient.post('/simulate', params),
