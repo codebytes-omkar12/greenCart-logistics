@@ -38,3 +38,15 @@ export interface IDashboardStats {
     pendingOrders: number;
     totalProfit: number;
 }
+
+// Added for authentication forms
+export interface ICredentials {
+    username?: string;
+    password?: string;
+}
+
+export interface ISimulationParams {
+    numDrivers: number;
+    maxHours: number;
+    startTime: string;
+}
