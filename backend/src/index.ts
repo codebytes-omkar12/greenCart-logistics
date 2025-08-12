@@ -1,18 +1,23 @@
+import dotenv from 'dotenv';
 import express, { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import session from 'express-session';
 import cors from 'cors';
-import dotenv from 'dotenv';
 
-// Import all controllers
-import * as controllers from './controllers';
+
+// --- UPDATED: Use named imports for clarity and to resolve the error ---
+import { registerUser, loginUser, logoutUser, getAuthStatus } from './controllers/auth.controller';
+import { createDriver, getDrivers, updateDriver, deleteDriver } from './controllers/driver.controller';
+import { createRoute, getRoutes, updateRoute, deleteRoute } from './controllers/route.controller';
+import { createOrder, getOrders, updateOrder, deleteOrder } from './controllers/order.controller';
+import { getSimulations, runSimulation, generateAiSummary } from './controllers/simulation.controller';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// --- MIDDLEWARE SETUP ---
+
 app.use(cors({
     origin: process.env.FRONTEND_URL || 'http://localhost:5173',
     credentials: true
@@ -25,7 +30,7 @@ app.use(session({
     cookie: {
         secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
-        maxAge: 1000 * 60 * 60 * 24 // 24 hours
+        maxAge: 1000 * 60 * 60 * 24
     }
 }));
 
@@ -35,12 +40,12 @@ declare module 'express-session' {
     }
 }
 
-// --- DATABASE CONNECTION ---
+// --- DATABASE CONNECTION 
 mongoose.connect(process.env.MONGO_URI!)
     .then(() => console.log('MongoDB Connected Successfully...'))
     .catch(err => console.error('MongoDB Connection Error:', err));
 
-// --- AUTHENTICATION MIDDLEWARE ---
+// --- AUTHENTICATION MIDDLEWARE 
 const requireAuth = (req: Request, res: Response, next: NextFunction) => {
     if (req.session && req.session.userId) {
         return next();
@@ -49,41 +54,39 @@ const requireAuth = (req: Request, res: Response, next: NextFunction) => {
     }
 };
 
-// --- API ROUTES ---
+// --- API ROUTES 
 
 // Auth Routes
-app.post('/api/register', controllers.registerUser);
-app.post('/api/login', controllers.loginUser);
-app.post('/api/logout', controllers.logoutUser);
-app.get('/api/auth/status', controllers.getAuthStatus);
+app.post('/api/register', registerUser);
+app.post('/api/login', loginUser);
+app.post('/api/logout', logoutUser);
+app.get('/api/auth/status', getAuthStatus);
 
-// --- FULL CRUD Routes ---
+// Driver Routes
+app.post('/api/drivers', requireAuth, createDriver);
+app.get('/api/drivers', requireAuth, getDrivers);
+app.put('/api/drivers/:id', requireAuth, updateDriver);
+app.delete('/api/drivers/:id', requireAuth, deleteDriver);
 
-// Drivers
-app.post('/api/drivers', requireAuth, controllers.createDriver);
-app.get('/api/drivers', requireAuth, controllers.getDrivers);
-app.put('/api/drivers/:id', requireAuth, controllers.updateDriver);
-app.delete('/api/drivers/:id', requireAuth, controllers.deleteDriver);
+// Route Routes
+app.post('/api/routes', requireAuth, createRoute);
+app.get('/api/routes', requireAuth, getRoutes);
+app.put('/api/routes/:id', requireAuth, updateRoute);
+app.delete('/api/routes/:id', requireAuth, deleteRoute);
 
-// Routes
-app.post('/api/routes', requireAuth, controllers.createRoute);
-app.get('/api/routes', requireAuth, controllers.getRoutes);
-app.put('/api/routes/:id', requireAuth, controllers.updateRoute);
-app.delete('/api/routes/:id', requireAuth, controllers.deleteRoute);
+// Order Routes
+app.post('/api/orders', requireAuth, createOrder);
+app.get('/api/orders', requireAuth, getOrders);
+app.put('/api/orders/:id', requireAuth, updateOrder);
+app.delete('/api/orders/:id', requireAuth, deleteOrder);
 
-// Orders
-app.post('/api/orders', requireAuth, controllers.createOrder);
-app.get('/api/orders', requireAuth, controllers.getOrders);
-app.put('/api/orders/:id', requireAuth, controllers.updateOrder);
-app.delete('/api/orders/:id', requireAuth, controllers.deleteOrder);
+// Simulation Routes
+app.get('/api/simulations', requireAuth, getSimulations);
+app.post('/api/simulate', requireAuth, runSimulation);
+app.post('/api/simulations/:id/generate-summary', requireAuth, generateAiSummary);
 
 
-// --- SIMULATION Routes ---
-app.get('/api/simulations', requireAuth, controllers.getSimulations);
-app.post('/api/simulate', requireAuth, controllers.runSimulation);
-app.post('/api/simulations/:id/generate-summary', requireAuth, controllers.generateAiSummary);
-
-// --- SERVER START & EXPORT ---
+// --- SERVER START & EXPORT 
 app.listen(PORT, () => console.log(`Backend server running on http://localhost:${PORT}`));
 
 export default app;
