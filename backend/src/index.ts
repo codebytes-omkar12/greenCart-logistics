@@ -1,4 +1,9 @@
-
+/*
+ * GreenCart Logistics - Backend Server (Refactored)
+ *
+ * This file handles server setup, middleware, and API routing.
+ * All business logic is delegated to controllers.
+ */
 
 import express, { Request, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
@@ -6,8 +11,8 @@ import session from 'express-session';
 import cors from 'cors';
 import dotenv from 'dotenv';
 
-
-
+// Import all controllers
+import * as controllers from './controllers';
 
 dotenv.config();
 
@@ -51,11 +56,24 @@ const requireAuth = (req: Request, res: Response, next: NextFunction) => {
     }
 };
 
+// --- API ROUTES ---
 
+// Auth Routes
+app.post('/api/register', controllers.registerUser);
+app.post('/api/login', controllers.loginUser);
+app.post('/api/logout', controllers.logoutUser);
+app.get('/api/auth/status', controllers.getAuthStatus);
 
+// CRUD Routes
+app.get('/api/drivers', requireAuth, controllers.getDrivers);
+app.get('/api/routes', requireAuth, controllers.getRoutes);
+app.get('/api/orders', requireAuth, controllers.getOrders);
+app.get('/api/simulations', requireAuth, controllers.getSimulations);
 
+// Core Simulation Route
+app.post('/api/simulate', requireAuth, controllers.runSimulation);
 
 // --- SERVER START & EXPORT ---
 app.listen(PORT, () => console.log(`Backend server running on http://localhost:${PORT}`));
 
-export default app; 
+export default app; // For Vercel deployment
