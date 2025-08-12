@@ -9,11 +9,9 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        // You will need to create a backend endpoint for this.
-        // For now, using a mock to avoid breaking the UI.
-        // const response = await api.getDashboardStats();
-        // setStats(response.data);
-        setStats({ totalDrivers: 10, totalOrders: 50, pendingOrders: 15, totalProfit: 25000 });
+        // Use the real API endpoint now
+        const response = await api.getDashboardStats();
+        setStats(response.data);
       } catch (error) {
         console.error("Failed to fetch dashboard stats", error);
       } finally {

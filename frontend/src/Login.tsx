@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { api } from './api';
 
 interface LoginProps {
-  onLogin: (token: string) => void;
+  onLogin: () => void; // Simplified callback
   onSwitchToRegister: () => void;
 }
 
@@ -17,9 +17,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, onSwitchToRegister }) => {
     setError('');
     setLoading(true);
     try {
-      const response = await api.login({ username, password });
-      // Assuming the token is in response.data.token
-      onLogin(response.data.token || 'fake-jwt-token'); 
+      await api.login({ username, password });
+      onLogin(); // Just notify the parent that login was successful
     } catch (err) {
       setError('Failed to login. Please check your credentials.');
     } finally {
@@ -27,6 +26,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onSwitchToRegister }) => {
     }
   };
 
+  // The JSX for the form remains exactly the same as before
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
       <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-lg shadow-md">
