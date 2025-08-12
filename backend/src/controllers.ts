@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { isValidObjectId } from 'mongoose';
 
 
 import {
@@ -87,6 +88,8 @@ export const getAuthStatus = (req: Request, res: Response) => {
 
 // --- CRUD CONTROLLERS ---
 
+// DRIVERS
+
 export const getDrivers = async (req: Request, res: Response) => {
     try {
         const { name, isFatigued } = req.query;
@@ -106,6 +109,53 @@ export const getDrivers = async (req: Request, res: Response) => {
         res.status(500).json({ message: "Error fetching drivers", error: error.message });
     }
 };
+export const createDriver = async (req: Request, res: Response) => {
+    try {
+        const { name, past7DayWorkHours, isFatigued } = req.body;
+        if (!name) {
+            return res.status(400).json({ message: 'Driver name is required.' });
+        }
+        const newDriver = new Driver({ name, past7DayWorkHours, isFatigued });
+        await newDriver.save();
+        res.status(201).json(newDriver);
+    } catch (error: any) {
+        res.status(500).json({ message: 'Error creating driver', error: error.message });
+    }
+};
+
+export const updateDriver = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        if (!isValidObjectId(id)) {
+            return res.status(400).json({ message: 'Invalid driver ID.' });
+        }
+        const updatedDriver = await Driver.findByIdAndUpdate(id, req.body, { new: true });
+        if (!updatedDriver) {
+            return res.status(404).json({ message: 'Driver not found.' });
+        }
+        res.json(updatedDriver);
+    } catch (error: any) {
+        res.status(500).json({ message: 'Error updating driver', error: error.message });
+    }
+};
+
+export const deleteDriver = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        if (!isValidObjectId(id)) {
+            return res.status(400).json({ message: 'Invalid driver ID.' });
+        }
+        const deletedDriver = await Driver.findByIdAndDelete(id);
+        if (!deletedDriver) {
+            return res.status(404).json({ message: 'Driver not found.' });
+        }
+        res.json({ message: 'Driver deleted successfully.' });
+    } catch (error: any) {
+        res.status(500).json({ message: 'Error deleting driver', error: error.message });
+    }
+};
+
+// ROUTES
 
 export const getRoutes = async (req: Request, res: Response) => {
     try {
@@ -128,6 +178,41 @@ export const getRoutes = async (req: Request, res: Response) => {
         res.status(500).json({ message: "Error fetching routes", error: error.message });
     }
 };
+export const createRoute = async (req: Request, res: Response) => {
+    try {
+        const newRoute = new Route(req.body);
+        await newRoute.save();
+        res.status(201).json(newRoute);
+    } catch (error: any) {
+        res.status(500).json({ message: 'Error creating route', error: error.message });
+    }
+};
+
+export const updateRoute = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        if (!isValidObjectId(id)) return res.status(400).json({ message: 'Invalid route ID.' });
+        const updatedRoute = await Route.findByIdAndUpdate(id, req.body, { new: true });
+        if (!updatedRoute) return res.status(404).json({ message: 'Route not found.' });
+        res.json(updatedRoute);
+    } catch (error: any) {
+        res.status(500).json({ message: 'Error updating route', error: error.message });
+    }
+};
+
+export const deleteRoute = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        if (!isValidObjectId(id)) return res.status(400).json({ message: 'Invalid route ID.' });
+        const deletedRoute = await Route.findByIdAndDelete(id);
+        if (!deletedRoute) return res.status(404).json({ message: 'Route not found.' });
+        res.json({ message: 'Route deleted successfully.' });
+    } catch (error: any) {
+        res.status(500).json({ message: 'Error deleting route', error: error.message });
+    }
+};
+
+// ORDERS
 
 export const getOrders = async (req: Request, res: Response) => {
     try {
@@ -148,6 +233,39 @@ export const getOrders = async (req: Request, res: Response) => {
         res.status(500).json({ message: "Error fetching orders", error: error.message });
     }
 };
+export const createOrder = async (req: Request, res: Response) => {
+    try {
+        const newOrder = new Order(req.body);
+        await newOrder.save();
+        res.status(201).json(newOrder);
+    } catch (error: any) {
+        res.status(500).json({ message: 'Error creating order', error: error.message });
+    }
+};
+
+export const updateOrder = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        if (!isValidObjectId(id)) return res.status(400).json({ message: 'Invalid order ID.' });
+        const updatedOrder = await Order.findByIdAndUpdate(id, req.body, { new: true });
+        if (!updatedOrder) return res.status(404).json({ message: 'Order not found.' });
+        res.json(updatedOrder);
+    } catch (error: any) {
+        res.status(500).json({ message: 'Error updating order', error: error.message });
+    }
+};
+
+export const deleteOrder = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        if (!isValidObjectId(id)) return res.status(400).json({ message: 'Invalid order ID.' });
+        const deletedOrder = await Order.findByIdAndDelete(id);
+        if (!deletedOrder) return res.status(404).json({ message: 'Order not found.' });
+        res.json({ message: 'Order deleted successfully.' });
+    } catch (error: any) {
+        res.status(500).json({ message: 'Error deleting order', error: error.message });
+    }
+};
 
 export const getSimulations = async (req: Request, res: Response) => {
     // No filtering needed for simulations for now
@@ -163,13 +281,16 @@ export const getSimulations = async (req: Request, res: Response) => {
 
 export const runSimulation = async (req: Request, res: Response) => {
     try {
-        const { numDrivers, maxHours }: { numDrivers: number, maxHours: number } = req.body;
+        const { numDrivers, maxHours, startTime } = req.body;
 
-        if (!numDrivers || !maxHours || numDrivers <= 0 || maxHours <= 0) {
-            return res.status(400).json({ message: "Number of drivers and max hours must be positive numbers." });
+        if (!numDrivers || !maxHours || !startTime || numDrivers <= 0 || maxHours <= 0) {
+            return res.status(400).json({ message: "Number of drivers, max hours, and start time are required and must be positive." });
+        }
+        if (!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(startTime)) {
+            return res.status(400).json({ message: 'Invalid start time format. Please use HH:MM.' });
         }
 
-        const availableDrivers: IDriver[] = await Driver.find();
+        const availableDrivers: IDriver[] = await Driver.find().limit(numDrivers);
         if (availableDrivers.length < numDrivers) {
             return res.status(400).json({ message: `Simulation requires ${numDrivers} drivers, but only ${availableDrivers.length} are in the database.` });
         }
@@ -179,6 +300,14 @@ export const runSimulation = async (req: Request, res: Response) => {
             return res.status(400).json({ message: "No pending orders to simulate." });
         }
 
+        const dailyWorkLog = new Map<string, number>();
+        availableDrivers.forEach(driver => {
+            // --- FIX 1: Add a check for driver._id ---
+            if (driver._id) {
+                dailyWorkLog.set(driver._id.toString(), 0);
+            }
+        });
+
         let totalProfit = 0;
         let onTimeDeliveries = 0;
         let lateDeliveries = 0;
@@ -187,40 +316,59 @@ export const runSimulation = async (req: Request, res: Response) => {
         for (let i = 0; i < pendingOrders.length; i++) {
             const order = pendingOrders[i];
             const driver = availableDrivers[i % numDrivers];
-            const route = order.assignedRoute as IRoute; // Assert type after population
+            const route = order.assignedRoute as IRoute;
 
-            if (!route) continue;
+            // --- FIX 2: Add a check before using driver._id in the loop ---
+            if (!route || !driver._id) continue;
 
             let deliveryTime = route.baseTime;
             if (driver.isFatigued) {
                 deliveryTime *= 1.30;
             }
 
-            const isLate = deliveryTime > (route.baseTime + 10);
-            let penalty = isLate ? 50 : 0;
-            if (isLate) lateDeliveries++; else onTimeDeliveries++;
+            const deliveryHours = deliveryTime / 60;
+            const currentHours = dailyWorkLog.get(driver._id.toString()) || 0;
+            
+            if (currentHours + deliveryHours <= maxHours) {
+                dailyWorkLog.set(driver._id.toString(), currentHours + deliveryHours);
 
-            let bonus = (order.value_rs > 1000 && !isLate) ? order.value_rs * 0.10 : 0;
+                const isLate = deliveryTime > (route.baseTime + 10);
+                let penalty = isLate ? 50 : 0;
+                if (isLate) lateDeliveries++; else onTimeDeliveries++;
 
-            let fuelCost = route.distance * 5;
-            if (route.trafficLevel === 'High') {
-                fuelCost += route.distance * 2;
+                let bonus = (order.value_rs > 1000 && !isLate) ? order.value_rs * 0.10 : 0;
+
+                let fuelCost = route.distance * 5;
+                if (route.trafficLevel === 'High') {
+                    fuelCost += route.distance * 2;
+                }
+                fuelCostBreakdown[route.trafficLevel] += fuelCost;
+
+                totalProfit += (order.value_rs + bonus - penalty - fuelCost);
             }
-            fuelCostBreakdown[route.trafficLevel] += fuelCost;
-
-            totalProfit += (order.value_rs + bonus - penalty - fuelCost);
         }
 
         const efficiencyScore = pendingOrders.length > 0 ? (onTimeDeliveries / pendingOrders.length) * 100 : 0;
 
-       
+        for (const driver of availableDrivers) {
+            // --- FIX 3: Add a final check before saving ---
+            if (!driver._id) continue;
+
+            const hoursWorked = dailyWorkLog.get(driver._id.toString()) || 0;
+            driver.isFatigued = hoursWorked > 8;
+            
+            driver.past7DayWorkHours.shift();
+            driver.past7DayWorkHours.push(hoursWorked);
+            
+            await driver.save();
+        }
 
         const newSimulation = new Simulation({
             totalProfit, efficiencyScore, onTimeDeliveries, lateDeliveries, fuelCostBreakdown
         });
         await newSimulation.save();
 
-        res.status(200).json(newSimulation);
+        res.status(201).json(newSimulation);
 
     } catch (error: any) {
         console.error("Simulation Error:", error);

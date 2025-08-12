@@ -57,18 +57,33 @@ app.post('/api/login', controllers.loginUser);
 app.post('/api/logout', controllers.logoutUser);
 app.get('/api/auth/status', controllers.getAuthStatus);
 
-// CRUD Routes
+// --- FULL CRUD Routes ---
+
+// Drivers
+app.post('/api/drivers', requireAuth, controllers.createDriver);
 app.get('/api/drivers', requireAuth, controllers.getDrivers);
+app.put('/api/drivers/:id', requireAuth, controllers.updateDriver);
+app.delete('/api/drivers/:id', requireAuth, controllers.deleteDriver);
+
+// Routes
+app.post('/api/routes', requireAuth, controllers.createRoute);
 app.get('/api/routes', requireAuth, controllers.getRoutes);
+app.put('/api/routes/:id', requireAuth, controllers.updateRoute);
+app.delete('/api/routes/:id', requireAuth, controllers.deleteRoute);
+
+// Orders
+app.post('/api/orders', requireAuth, controllers.createOrder);
 app.get('/api/orders', requireAuth, controllers.getOrders);
+app.put('/api/orders/:id', requireAuth, controllers.updateOrder);
+app.delete('/api/orders/:id', requireAuth, controllers.deleteOrder);
+
+
+// --- SIMULATION Routes ---
 app.get('/api/simulations', requireAuth, controllers.getSimulations);
-
-// Core Simulation Route
 app.post('/api/simulate', requireAuth, controllers.runSimulation);
-
 app.post('/api/simulations/:id/generate-summary', requireAuth, controllers.generateAiSummary);
 
 // --- SERVER START & EXPORT ---
 app.listen(PORT, () => console.log(`Backend server running on http://localhost:${PORT}`));
 
-export default app; // For Vercel deployment
+export default app;
