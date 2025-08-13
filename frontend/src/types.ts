@@ -30,6 +30,8 @@ export interface ISimulation {
     onTimeDeliveries: number;
     lateDeliveries: number;
     tags: string[];
+    aiSummary?: string; 
+   
 }
 
 export interface IDashboardStats {
@@ -49,4 +51,13 @@ export interface ISimulationParams {
     numDrivers: number;
     maxHours: number;
     startTime: string;
+}
+export interface IChartDataSet {
+    labels: string[];
+    data: number[];
+}
+
+export interface IChartData {
+    barChartData: IChartDataSet;
+    pieChartData: IChartDataSet;
 }

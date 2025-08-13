@@ -10,8 +10,8 @@ import { registerUser, loginUser, logoutUser, getAuthStatus } from './controller
 import { createDriver, getDrivers, updateDriver, deleteDriver } from './controllers/driver.controller';
 import { createRoute, getRoutes, updateRoute, deleteRoute } from './controllers/route.controller';
 import { createOrder, getOrders, updateOrder, deleteOrder } from './controllers/order.controller';
-import { getSimulations, runSimulation, generateAiSummary } from './controllers/simulation.controller';
-import { getDashboardStats } from './controllers/dashboard.controller';
+import { getSimulations, runSimulation, generateAiSummary,deleteSimulation } from './controllers/simulation.controller';
+import { getDashboardStats,getChartData } from './controllers/dashboard.controller';
 
 
 dotenv.config();
@@ -86,7 +86,9 @@ app.delete('/api/orders/:id', requireAuth, deleteOrder);
 app.get('/api/simulations', requireAuth, getSimulations);
 app.post('/api/simulate', requireAuth, runSimulation);
 app.post('/api/simulations/:id/generate-summary', requireAuth, generateAiSummary);
+app.delete('/api/simulations/:id',requireAuth, deleteSimulation);
 app.get('/api/dashboard/stats', requireAuth, getDashboardStats);
+app.get('/api/dashboard/charts', requireAuth, getChartData);
 
 
 // --- SERVER START & EXPORT 

@@ -48,6 +48,18 @@ export const getSimulations = async (req: Request, res: Response) => {
         res.status(500).json({ message: "Error fetching simulation history", error: error.message });
     }
 };
+export const deleteSimulation = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const deletedSimulation = await Simulation.findByIdAndDelete(id);
+        if (!deletedSimulation) {
+            return res.status(404).json({ message: 'Simulation not found.' });
+        }
+        res.status(200).json({ message: 'Simulation deleted successfully.' });
+    } catch (error: any) {
+        res.status(500).json({ message: "Error deleting simulation", error: error.message });
+    }
+};
 
 export const runSimulation = async (req: Request, res: Response) => {
     try {
@@ -76,6 +88,8 @@ export const runSimulation = async (req: Request, res: Response) => {
         let onTimeDeliveries = 0;
         let lateDeliveries = 0;
         const fuelCostBreakdown: { [key: string]: number } = { Low: 0, Medium: 0, High: 0 };
+         const updatePromises: Promise<any>[] = [];
+
         for (let i = 0; i < pendingOrders.length; i++) {
             const order = pendingOrders[i];
             const driver = availableDrivers[i % numDrivers];
@@ -98,7 +112,13 @@ export const runSimulation = async (req: Request, res: Response) => {
                     fuelCost += route.distance * 2;
                 }
                 fuelCostBreakdown[route.trafficLevel] += fuelCost;
+
                 totalProfit += (order.value_rs + bonus - penalty - fuelCost);
+                const orderUpdatePromise = Order.findByIdAndUpdate(order._id, {
+                    deliveryTimestamp: new Date(),
+                    isDeliveredOnTime: !isLate
+                });
+                updatePromises.push(orderUpdatePromise);
             }
         }
         const efficiencyScore = pendingOrders.length > 0 ? (onTimeDeliveries / pendingOrders.length) * 100 : 0;
@@ -108,11 +128,15 @@ export const runSimulation = async (req: Request, res: Response) => {
             driver.isFatigued = hoursWorked > 8;
             driver.past7DayWorkHours.shift();
             driver.past7DayWorkHours.push(hoursWorked);
-            await driver.save();
+            updatePromises.push(driver.save());
         }
         const newSimulation = new Simulation({
             totalProfit, efficiencyScore, onTimeDeliveries, lateDeliveries, fuelCostBreakdown
         });
+         updatePromises.push(newSimulation.save());
+
+       
+        await Promise.all(updatePromises);
         await newSimulation.save();
         res.status(201).json(newSimulation);
     } catch (error: any) {
@@ -124,18 +148,20 @@ export const runSimulation = async (req: Request, res: Response) => {
 
 export const generateAiSummary = async (req: Request, res: Response) => {
     try {
-        // --- UPDATED: Get AI client for each request ---
         const ai = getAiClient();
 
         const { id } = req.params;
         const simulation: ISimulation | null = await Simulation.findById(id);
 
         if (!simulation) {
-            return res.status(404).json({ message: 'Simulation not found.' });
+            return res.status(404).json({ message: "Simulation not found." });
         }
 
         if (simulation.aiSummary && simulation.tags.length > 0) {
-            return streamTextToClient(res, simulation.aiSummary);
+            return res.json({
+                summary: simulation.aiSummary,
+                tags: simulation.tags
+            });
         }
 
         const prompt = `You are an expert operations analyst for GreenCart Logistics. Your task is to analyze simulation data and return a structured JSON object.
@@ -164,31 +190,44 @@ export const generateAiSummary = async (req: Request, res: Response) => {
                 - On-time Deliveries: ${simulation.onTimeDeliveries}
                 - Late Deliveries: ${simulation.lateDeliveries}
                 - Fuel Cost Breakdown: ${JSON.stringify(simulation.fuelCostBreakdown)}
-                `;
-        // --- UPDATED: Call the API using the new SDK's syntax from your example ---
-        const response = await ai.models.generateContentStream({
-            model: 'gemini-2.5-flash',
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        `;
+
+        // --- Non-streaming Gemini call ---
+        const result = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
             config: {
                 temperature: 0.2,
-                maxOutputTokens: 500,
-            },
+                maxOutputTokens: 500
+            }
         });
 
-        // --- Assemble the full response from the stream ---
-        let responseText = '';
-        // The new SDK returns the stream directly on the response object
-        for await (const chunk of response) {
-            responseText += (chunk.text || '');
+        const responseText = (result.text ?? "").trim();
+
+        // --- Bulletproof JSON extraction ---
+        let cleanedText = "";
+        let aiResponse: { summary: string; tags: string[] };
+
+        try {
+            const jsonMatch = responseText.match(/\{[\s\S]*\}/m);
+            if (jsonMatch) {
+                cleanedText = jsonMatch[0];
+            } else {
+                cleanedText = responseText;
+            }
+
+            cleanedText = cleanedText
+                .replace(/```json/gi, "")
+                .replace(/```/g, "")
+                .trim();
+
+            aiResponse = JSON.parse(cleanedText);
+        } catch (parseError) {
+            console.error("AI raw output (for debugging):", responseText);
+            throw new Error(`Failed to parse AI JSON: ${parseError}`);
         }
 
-        // --- FIX: Clean the response text before parsing ---
-        const cleanedText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-
-        // --- (Parsing and saving logic is unchanged) ---
-        const aiResponse = JSON.parse(cleanedText);
         const { summary, tags } = aiResponse;
-
         if (!summary || !tags || !Array.isArray(tags)) {
             throw new Error("AI response was not in the expected JSON format.");
         }
@@ -196,22 +235,23 @@ export const generateAiSummary = async (req: Request, res: Response) => {
         simulation.aiSummary = summary;
         simulation.tags = tags;
         await simulation.save();
-        
-        streamTextToClient(res, summary);
+
+        return res.json(aiResponse);
 
     } catch (error: any) {
-        // --- (Error handling is unchanged) ---
-        console.error('Gemini API error:', error);
+        console.error("Gemini API error:", error);
         const errorMessage = error instanceof Error ? error.message : String(error);
-        if (errorMessage.includes('429') || /rateLimitExceeded|quota/i.test(errorMessage)) {
-            return res.status(429).send('API rate limit exceeded.');
+        if (errorMessage.includes("429") || /rateLimitExceeded|quota/i.test(errorMessage)) {
+            return res.status(429).send("API rate limit exceeded.");
         }
         res.status(500).json({
-            error: 'Failed to get AI summary',
-            details: errorMessage,
+            error: "Failed to get AI summary",
+            details: errorMessage
         });
     }
 };
+
+
 
 
 

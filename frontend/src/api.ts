@@ -17,10 +17,12 @@ export const api = {
 
   // --- Data Fetching ---
   getDashboardStats: () => apiClient.get('/dashboard/stats'),
+  getChartData: () => apiClient.get('/dashboard/charts'),
   getDrivers: () => apiClient.get('/drivers'),
   getRoutes: () => apiClient.get('/routes'),
   getOrders: () => apiClient.get('/orders'),
   getSimulations: () => apiClient.get('/simulations'),
+  deleteSimulation: (id: string) => apiClient.delete(`/simulations/${id}`),
 
   // --- Driver Actions ---
   createDriver: (driverData: Omit<IDriver, '_id'>) => apiClient.post('/drivers', driverData),
