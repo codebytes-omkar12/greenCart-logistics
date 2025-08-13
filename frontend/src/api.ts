@@ -1,7 +1,8 @@
 import axios from 'axios';
 import { type ICredentials, type ISimulationParams, type IDriver, type IRoute, type IOrder  } from './types';
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
 
 const apiClient = axios.create({
   baseURL: API_URL,
